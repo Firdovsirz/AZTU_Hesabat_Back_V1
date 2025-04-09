@@ -1,18 +1,27 @@
+import os
 import jwt
 import datetime
 from functools import wraps
-from flask import current_app
-from flask import request, jsonify
+from models.userModel import User
+from flask import current_app, request, jsonify
 
-SECRET_KEY = 'your_secret_key'
-def encode_auth_token(user_id, fin_kod, role):
+
+SECRET_KEY = os.getenv('SECRET_KEY')
+
+def encode_auth_token(user_id, fin_kod):
     try:
+        # Query the user from the database
+        user = User.query.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        role_code = user.role_code
         expiration_time = datetime.datetime.utcnow() + datetime.timedelta(hours=1)
-        
+
         payload = {
             'sub': str(user_id),
             'fin_kod': str(fin_kod),
-            'role': str(role),
+            'role_code': role_code,
             'exp': expiration_time
         }
 
@@ -21,7 +30,9 @@ def encode_auth_token(user_id, fin_kod, role):
         return auth_token
 
     except Exception as e:
+        current_app.logger.error(f"Error encoding token: {e}")
         return str(e)
+
 
 def decode_auth_token(auth_token):
     try:
@@ -34,7 +45,7 @@ def decode_auth_token(auth_token):
         return {
             'user_id': payload['sub'],
             'fin_kod': payload['fin_kod'],
-            'role': payload['role']
+            'role_code': payload['role_code']
         }
 
     except jwt.ExpiredSignatureError:

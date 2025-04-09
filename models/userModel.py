@@ -1,7 +1,6 @@
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import ForeignKey
+from extensions.extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
-
-db = SQLAlchemy()
 
 class User(db.Model):
     __tablename__ = 'sexsler'
@@ -12,13 +11,15 @@ class User(db.Model):
     ata_adi = db.Column(db.String(100), nullable=False)
     fin_kod = db.Column(db.String(10), nullable=False)
     password_hash = db.Column(db.String(100), nullable=False)
-    faculty_id = db.Column(db.Integer)
-    faculty_name = db.Column(db.Text)
-    kafedra_id = db.Column(db.Integer)
-    kafedra_name = db.Column(db.Text)
+    faculty_code = db.Column(db.Integer, ForeignKey('faculty.faculty_code'))
+    cafedra_code = db.Column(db.Text)
     vezife_id = db.Column(db.Integer)
     vezife_name = db.Column(db.Text)
-    icrayamesulsexs_id = db.Column(db.Integer)
+    ishesabat = db.Column(db.Integer)
+    role_code = db.Column(db.Integer, ForeignKey('roles.role_code'))
+    faculty = db.relationship('Faculty', backref='faculties', lazy=True)
+    role = db.relationship('Roles', backref='users', lazy=True)
+    kafedras = db.relationship('Plan', backref='plan', lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -26,18 +27,18 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
-    def to_dict(self):
+    def user_detail(self):
         return {
             'id': self.id,
             'ad': self.ad,
             'soyad': self.soyad,
             'ata_adi': self.ata_adi,
             'fin_kod': self.fin_kod,
-            'faculty_id': self.faculty_id,
-            'faculty_name': self.faculty_name,
-            'kafedra_id': self.kafedra_id,
-            'kafedra_name': self.kafedra_name,
+            'faculty_code': self.faculty_code,
+            'faculty_name': self.faculty.faculty_name if self.faculty else None,
+            'cafedra_code': self.cafedra_code,
             'vezife_id': self.vezife_id,
             'vezife_name': self.vezife_name,
-            'icrayamesulsexs_id': self.icrayamesulsexs_id
+            'ishesabat': self.ishesabat,
+            'role_code': self.role_code
         }

@@ -1,23 +1,26 @@
 from functools import wraps
-from flask import request, jsonify
+from flask import request, g
 from utils.jwt_util import decode_auth_token
+from exception.exception import handle_unauthorized
 
 def token_required(f):
     @wraps(f)
-    def decorator(*args, **kwargs):
-        token = None
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return handle_unauthorized(401, 'Authorization token is missing.')
 
-        if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].split(" ")[1]
+        try:
+            token = auth_header.split(" ")[1]
+            payload = decode_auth_token(token)
 
-        if not token:
-            return jsonify({'message': 'Token is missing!', 'status': 403}), 403
+            if payload is None:
+                return handle_unauthorized(401, 'Token is invalid or expired.')
 
-        user_id = decode_auth_token(token)
+            g.user = payload  # Store payload for access in routes
 
-        if user_id is None:
-            return jsonify({'message': 'Invalid or expired token!', 'status': 401}), 401
+        except Exception as e:
+            return handle_unauthorized(401, f'Invalid token format: {str(e)}')
 
-        return f(user_id, *args, **kwargs)
-
-    return decorator
+        return f(*args, **kwargs)
+    return decorated_function

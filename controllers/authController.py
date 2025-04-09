@@ -1,6 +1,13 @@
+from flask_cors import cross_origin
+from flask import Blueprint, request
 from models.userModel import db, User
 from utils.jwt_util import encode_auth_token
-from flask import Blueprint, request, jsonify
+from exception.exception import handle_creation
+from exception.exception import handle_conflict
+from exception.exception import handle_not_found
+from exception.exception import handle_unauthorized
+from exception.exception import handle_missing_field
+from exception.exception import handle_signin_success
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -9,30 +16,30 @@ def signup():
     data = request.get_json()
 
     required_fields = [
-        'ad', 'soyad', 'ata_adi', 'fin_kod', 'password', 'faculty_id',
-        'faculty_name', 'kafedra_id', 'kafedra_name', 'vezife_id', 
-        'vezife_name', 'icrayamesulsexs_id'
+        'ad', 'soyad', 'ata_adi', 'fin_kod', 'password', 'faculty_code',
+        'cafedra_code', 'vezife_id',
+        'vezife_name', 'ishesabat', 'role_code'
     ]
 
     for field in required_fields:
         if field not in data:
-            return jsonify({'error': f'Missing required field: {field}'}), 400
+            return handle_missing_field(404)
         
     ad = data.get('ad')
     soyad = data.get('soyad')
     ata_adi = data.get('ata_adi')
     fin_kod = data.get('fin_kod')
     password = data.get('password')
-    faculty_id = data.get('faculty_id')
-    faculty_name = data.get('faculty_name')
-    kafedra_id = data.get('kafedra_id')
-    kafedra_name = data.get('kafedra_name')
+    faculty_code = data.get('faculty_code')
+    cafedra_code = data.get('cafedra_code')
     vezife_id = data.get('vezife_id')
     vezife_name = data.get('vezife_name')
-    icrayamesulsexs_id = data.get('icrayamesulsexs_id')
+    ishesabat = data.get('ishesabat')
+    role_code = data.get('role_code')
 
     if User.query.filter_by(fin_kod=fin_kod).first():
-        return jsonify({'message': 'User already exists.'}), 400
+        return handle_conflict(409)
+
 
     user = User(
         ad=ad,
@@ -40,13 +47,12 @@ def signup():
         ata_adi=ata_adi,
         fin_kod=fin_kod,
         password_hash='',
-        faculty_id=faculty_id,
-        faculty_name=faculty_name,
-        kafedra_id=kafedra_id,
-        kafedra_name=kafedra_name,
+        faculty_code=faculty_code,
+        cafedra_code=cafedra_code,
         vezife_id=vezife_id,
         vezife_name=vezife_name,
-        icrayamesulsexs_id=icrayamesulsexs_id
+        ishesabat=ishesabat,
+        role_code=role_code
     )
     
     user.set_password(password)
@@ -54,9 +60,10 @@ def signup():
     db.session.add(user)
     db.session.commit()
 
-    return jsonify({'message': 'User successfully registered.'}), 201
+    return handle_creation("User registered successfully.")
 
 @auth_bp.route('/api/signin', methods=['POST'])
+@cross_origin(origins=["http://localhost:5173"])
 def signin():
     data = request.get_json()
     fin_kod = data.get('fin_kod')
@@ -65,15 +72,11 @@ def signin():
     user = User.query.filter_by(fin_kod=fin_kod).first()
 
     if not user:
-        return jsonify({'message': 'User not found'}), 401
-    if not user.check_password(password):
-        return jsonify({'message': 'Invalid credentials'}), 401
+        return handle_unauthorized(401, "Invalid credentials.")
     
-    token = encode_auth_token(user.id, user.fin_kod, user.vezife_name)
+    if not user.check_password(password):
+        return handle_unauthorized(401, "Invalid credentials.")
+    
+    token = encode_auth_token(user.id, user.fin_kod)
 
-    return jsonify({
-        'status': 200,
-        'message': 'Success',
-        # 'data': user.to_dict(), // eger data login de qaytarilmali olsa bu istifade olunacaq 
-        'token': token
-    }), 200
+    return handle_signin_success(user.user_detail(), "Login granted.", token)
